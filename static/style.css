@@ -98,16 +98,20 @@ button:hover {
     align-items: flex-start;
     justify-content: center;
     margin-top: 20px;
-    gap: 20px;
+    height: 700px;
+    padding: 20px;
 }
 
 .team-column {
-    width: calc(40% - 30px);
+    width: 350px;
     background: #f8f9fa;
     padding: 15px;
     border-radius: 8px;
-    border-left: 4px solid #28a745;
+    border-top: 4px solid #28a745;
     flex-shrink: 0;
+    height: 100%;
+    margin-left: 20px;
+    margin-right: 20px;
 }
 
 .team-column h3 {
@@ -130,6 +134,7 @@ button:hover {
     display: flex;
     flex-direction: column;
     align-items: center;
+    height: 100%;
 }
 
 .attending-list h4 {
@@ -158,6 +163,7 @@ button:hover {
     border: 2px solid #dee2e6;
     transition: all 0.3s ease;
     position: relative;
+    z-index: 1000;
 }
 
 .player-bubble.moving {
@@ -203,6 +209,7 @@ button:hover {
     padding: 15px;
     border-radius: 8px;
     border-left: 4px solid #ffc107;
+    display: none;
 }
 
 .benched-section h3 {

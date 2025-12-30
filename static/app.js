@@ -55,8 +55,8 @@ function generateTeams() {
     button.textContent = 'Generating...';
     
     // Hide teams initially
-    teamsContainer.style.display = 'none';
-    benchedSection.style.display = 'none';
+    // teamsContainer.style.display = 'none';
+    // benchedSection.style.display = 'none';
     
     fetch(`/generate_teams?match_id=${matchId}`)
         .then(response => response.json())
@@ -88,8 +88,6 @@ function generateTeams() {
 
 function showAttendingPlayers(players) {
     const attendingDiv = document.getElementById('attending-players');
-    attendingDiv.style.display = 'block';
-    attendingDiv.innerHTML = '<h4>Attending Players</h4><div class="attending-players"></div>';
     
     const playersContainer = attendingDiv.querySelector('.attending-players');
     players.forEach(player => {

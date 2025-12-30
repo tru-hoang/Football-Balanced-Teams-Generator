@@ -15,11 +15,6 @@
         </div>
         
         <div class="section">
-            <h2>Players</h2>
-            <div id="players"></div>
-        </div>
-        
-        <div class="section">
             <h2>Generate Teams</h2>
             <select id="generate-match-select"></select>
             <button id="generate-teams">Generate Teams</button>
@@ -28,13 +23,16 @@
                     <h3>Team A</h3>
                     <div id="team-a-players" class="team-players"></div>
                 </div>
-                <div id="attending-players" class="attending-list" style="display: none;"></div>
+                <div id="attending-players" class="attending-list">
+                    <h4>Attending Players</h4>
+                    <div class="attending-players"></div>
+                </div>
                 <div id="team-b" class="team-column">
                     <h3>Team B</h3>
                     <div id="team-b-players" class="team-players"></div>
                 </div>
             </div>
-            <div id="benched" class="benched-section" style="display: none;">
+            <div id="benched" class="benched-section">
                 <h3>Benched</h3>
                 <div id="benched-players"></div>
             </div>

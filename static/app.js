@@ -11,14 +11,15 @@ function fetchMatches() {
             const generateSelect = document.getElementById('generate-match-select');
             const matchesDiv = document.getElementById('matches');
             data.forEach(match => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'match';
+                matchDiv.innerHTML = `<strong>${match.date}</strong> - ${match.location}`;
+                matchesDiv.appendChild(matchDiv);
+                
                 const option = document.createElement('option');
                 option.value = match.match_id;
                 option.text = `${match.date} at ${match.location}`;
                 generateSelect.appendChild(option);
-                
-                const div = document.createElement('div');
-                div.innerHTML = `<strong>${match.date}</strong> - ${match.location} (${match.players_per_team} per team)`;
-                matchesDiv.appendChild(div);
             });
         });
 }
@@ -29,10 +30,10 @@ function fetchPlayers() {
         .then(data => {
             const playersDiv = document.getElementById('players');
             data.forEach(player => {
-                const div = document.createElement('div');
-                div.className = 'player';
-                div.innerHTML = `<strong>${player.name}</strong> - ${player.primary_position} - Rating: ${player.overall_rating}`;
-                playersDiv.appendChild(div);
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player';
+                playerDiv.innerHTML = `<strong>${player.name}</strong><br>${player.primary_position} - Rating: ${player.overall_rating}`;
+                playersDiv.appendChild(playerDiv);
             });
         });
 }
@@ -43,32 +44,156 @@ function generateTeams() {
         alert('Please select match');
         return;
     }
+    
+    const button = document.getElementById('generate-teams');
+    const attendingDiv = document.getElementById('attending-players');
+    const teamsContainer = document.getElementById('teams-container');
+    const benchedSection = document.getElementById('benched');
+    
+    // Disable button
+    button.disabled = true;
+    button.textContent = 'Generating...';
+    
+    // Hide teams initially
+    teamsContainer.style.display = 'none';
+    benchedSection.style.display = 'none';
+    
     fetch(`/generate_teams?match_id=${matchId}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
                 alert(data.error);
+                resetUI();
                 return;
             }
-            const teamsDiv = document.getElementById('teams');
             
-            // Calculate total ratings
-            const totalA = data.team_a.reduce((sum, p) => sum + p.rating, 0);
-            const totalB = data.team_b.reduce((sum, p) => sum + p.rating, 0);
+            // Show attending players
+            const allPlayers = [...data.team_a, ...data.team_b];
+            if (data.benched) allPlayers.push(...data.benched);
+            showAttendingPlayers(allPlayers);
             
-            teamsDiv.innerHTML = `<h3>Team A (Total Rating: ${totalA.toFixed(1)})</h3>`;
-            data.team_a.forEach(p => {
-                teamsDiv.innerHTML += `${p.name} (${p.position}) - ${p.rating}<br>`;
-            });
-            teamsDiv.innerHTML += `<h3>Team B (Total Rating: ${totalB.toFixed(1)})</h3>`;
-            data.team_b.forEach(p => {
-                teamsDiv.innerHTML += `${p.name} (${p.position}) - ${p.rating}<br>`;
-            });
-            if (data.benched && data.benched.length > 0) {
-                teamsDiv.innerHTML += '<h3>Benched</h3>';
-                data.benched.forEach(p => {
-                    teamsDiv.innerHTML += `${p.name} (${p.position}) - ${p.rating}<br>`;
-                });
-            }
+            // Initialize team headers with total rating only
+            document.querySelector('#team-a h3').textContent = `Team A (Total: 0.0)`;
+            document.querySelector('#team-b h3').textContent = `Team B (Total: 0.0)`;
+            
+            // Start animation sequence
+            setTimeout(() => {
+                animatePlayersToTeams(data);
+            }, 1000); // Wait for attending list to show
+        })
+        .catch(() => {
+            resetUI();
         });
+}
+
+function showAttendingPlayers(players) {
+    const attendingDiv = document.getElementById('attending-players');
+    attendingDiv.style.display = 'block';
+    attendingDiv.innerHTML = '<h4>Attending Players</h4><div class="attending-players"></div>';
+    
+    const playersContainer = attendingDiv.querySelector('.attending-players');
+    players.forEach(player => {
+        const bubble = document.createElement('div');
+        bubble.className = 'player-bubble';
+        bubble.textContent = player.name;
+        bubble.dataset.playerId = player.name; // For identification
+        playersContainer.appendChild(bubble);
+    });
+}
+
+function animatePlayersToTeams(data) {
+    const attendingDiv = document.getElementById('attending-players');
+    const teamsContainer = document.getElementById('teams-container');
+    const benchedSection = document.getElementById('benched');
+    
+    // Show teams container
+    teamsContainer.style.display = 'flex';
+    
+    // Get all bubbles
+    const allBubbles = Array.from(attendingDiv.querySelectorAll('.player-bubble'));
+    const remainingBubbles = [...allBubbles];
+    
+    // Track current team stats
+    let teamAStats = { count: 0, total: 0 };
+    let teamBStats = { count: 0, total: 0 };
+    
+    function animateRandom() {
+        if (remainingBubbles.length === 0) {
+            // All done
+            setTimeout(() => {
+                resetUI();
+            }, 1000);
+            return;
+        }
+        
+        // Randomly select a bubble
+        const randomIndex = Math.floor(Math.random() * remainingBubbles.length);
+        const bubble = remainingBubbles[randomIndex];
+        remainingBubbles.splice(randomIndex, 1); // Remove from remaining
+        
+        const playerName = bubble.dataset.playerId;
+        let targetX = '0px';
+        let targetTeam = null;
+        let playerData = null;
+        
+        if (data.team_a.some(p => p.name === playerName)) {
+            targetX = '-250px'; // move left to team A
+            targetTeam = 'team-a-players';
+            playerData = data.team_a.find(p => p.name === playerName);
+        } else if (data.team_b.some(p => p.name === playerName)) {
+            targetX = '250px'; // move right to team B
+            targetTeam = 'team-b-players';
+            playerData = data.team_b.find(p => p.name === playerName);
+        } else if (data.benched && data.benched.some(p => p.name === playerName)) {
+            targetX = '0px'; // stay for benched
+            targetTeam = 'benched-players';
+            benchedSection.style.display = 'block';
+            playerData = data.benched.find(p => p.name === playerName);
+        }
+        
+        // Set the target position
+        bubble.style.setProperty('--target-x', targetX);
+        bubble.classList.add('moving');
+        
+        // After animation, add to team and continue
+        setTimeout(() => {
+            if (targetTeam && playerData) {
+                // Update stats only for team players, not benched
+                if (targetTeam === 'team-a-players') {
+                    teamAStats.count++;
+                    teamAStats.total += playerData.rating;
+                    const playerCard = document.createElement('div');
+                    playerCard.className = 'player-card';
+                    playerCard.textContent = `${teamAStats.count}. ${playerData.name} (${playerData.position}) - ${playerData.rating}`;
+                    document.getElementById(targetTeam).appendChild(playerCard);
+                    document.querySelector('#team-a h3').textContent = `Team A (Total: ${teamAStats.total.toFixed(1)})`;
+                } else if (targetTeam === 'team-b-players') {
+                    teamBStats.count++;
+                    teamBStats.total += playerData.rating;
+                    const playerCard = document.createElement('div');
+                    playerCard.className = 'player-card';
+                    playerCard.textContent = `${teamBStats.count}. ${playerData.name} (${playerData.position}) - ${playerData.rating}`;
+                    document.getElementById(targetTeam).appendChild(playerCard);
+                    document.querySelector('#team-b h3').textContent = `Team B (Total: ${teamBStats.total.toFixed(1)})`;
+                } else {
+                    // Benched players (no numbering)
+                    const playerCard = document.createElement('div');
+                    playerCard.className = 'player-card';
+                    playerCard.textContent = `${playerData.name} (${playerData.position}) - ${playerData.rating}`;
+                    document.getElementById(targetTeam).appendChild(playerCard);
+                }
+            }
+            bubble.style.display = 'none'; // Hide bubble
+            animateRandom(); // Continue with next random
+        }, 4000); // Match animation duration
+    }
+    
+    // Start the random sequence
+    animateRandom();
+}
+
+function resetUI() {
+    const button = document.getElementById('generate-teams');
+    button.disabled = false;
+    button.textContent = 'Generate Teams';
 }

@@ -8,17 +8,38 @@
 </head>
 <body>
     <h1>Football Club Team Generator</h1>
-    
-    <h2>Upcoming Matches</h2>
-    <div id="matches"></div>
-    
-    <h2>Players</h2>
-    <div id="players"></div>
-    
-    <h2>Generate Teams</h2>
-    <select id="generate-match-select"></select>
-    <button id="generate-teams">Generate Teams</button>
-    <div id="teams"></div>
+    <div class="container">
+        <div class="section">
+            <h2>Upcoming Matches</h2>
+            <div id="matches"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Players</h2>
+            <div id="players"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Generate Teams</h2>
+            <select id="generate-match-select"></select>
+            <button id="generate-teams">Generate Teams</button>
+            <div id="teams-container">
+                <div id="team-a" class="team-column">
+                    <h3>Team A</h3>
+                    <div id="team-a-players" class="team-players"></div>
+                </div>
+                <div id="attending-players" class="attending-list" style="display: none;"></div>
+                <div id="team-b" class="team-column">
+                    <h3>Team B</h3>
+                    <div id="team-b-players" class="team-players"></div>
+                </div>
+            </div>
+            <div id="benched" class="benched-section" style="display: none;">
+                <h3>Benched</h3>
+                <div id="benched-players"></div>
+            </div>
+        </div>
+    </div>
     
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

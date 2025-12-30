@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Team Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Football Club Team Generator</h1>
+    
+    <h2>Upcoming Matches</h2>
+    <div id="matches"></div>
+    
+    <h2>Players</h2>
+    <div id="players"></div>
+    
+    <h2>Generate Teams</h2>
+    <select id="generate-match-select"></select>
+    <button id="generate-teams">Generate Teams</button>
+    <div id="teams"></div>
+    
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

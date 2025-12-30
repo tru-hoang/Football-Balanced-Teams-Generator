@@ -167,6 +167,7 @@ button:hover {
 }
 
 .player-bubble.moving {
+    z-index: 2000;
     animation: moveToTeam 4s ease-in-out forwards;
 }
 
@@ -176,11 +177,11 @@ button:hover {
         opacity: 1;
     }
     50% {
-        transform: translateY(-50px) scale(1.1);
+        transform:scale(1.5);
         opacity: 1;
     }
     100% {
-        transform: translateY(-100px) translateX(var(--target-x, 0)) scale(0.8);
+        transform: translateX(var(--target-x, 0)) scale(1.2);
         opacity: 1;
     }
 }

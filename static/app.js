@@ -1,54 +1,81 @@
 document.addEventListener('DOMContentLoaded', function() {
-    fetchMatches();
-    fetchPlayers();
-    document.getElementById('generate-teams').addEventListener('click', generateTeams);
-});
-
-function fetchMatches() {
-    fetch('/matches')
-        .then(response => response.json())
-        .then(data => {
-            const generateSelect = document.getElementById('generate-match-select');
-            const matchesDiv = document.getElementById('matches');
-            data.forEach(match => {
-                const matchDiv = document.createElement('div');
-                matchDiv.className = 'match';
-                matchDiv.innerHTML = `<strong>${match.date}</strong> - ${match.location}`;
-                matchesDiv.appendChild(matchDiv);
-                
-                const option = document.createElement('option');
-                option.value = match.match_id;
-                option.text = `${match.date} at ${match.location}`;
-                generateSelect.appendChild(option);
-            });
-        });
-}
-
-function fetchPlayers() {
-    fetch('/players')
-        .then(response => response.json())
-        .then(data => {
-            const playersDiv = document.getElementById('players');
-            data.forEach(player => {
-                const playerDiv = document.createElement('div');
-                playerDiv.className = 'player';
-                playerDiv.innerHTML = `<strong>${player.name}</strong><br>${player.primary_position} - Rating: ${player.overall_rating}`;
-                playersDiv.appendChild(playerDiv);
-            });
-        });
-}
-
-function generateTeams() {
-    const matchId = document.getElementById('generate-match-select').value;
-    if (!matchId) {
-        alert('Please select match');
-        return;
+    const sheetUrlInput = document.getElementById('sheet-url');
+    const connectButton = document.getElementById('connect-data');
+    const teamGenerationSection = document.getElementById('team-generation-section');
+    const teamNameConfigSection = document.getElementById('team-name-config-section');
+    
+    // Load saved URL from cookie
+    const savedUrl = getCookie('sheetUrl');
+    if (savedUrl) {
+        sheetUrlInput.value = savedUrl;
+        connectButton.disabled = false;
     }
     
+    // Enable/disable connect button based on URL input
+    sheetUrlInput.addEventListener('input', function() {
+        connectButton.disabled = !this.value.trim();
+    });
+    
+    // Handle connect button click
+    connectButton.addEventListener('click', connectDataFile);
+    
+    // Initially hide team generation section and team name config section
+    teamGenerationSection.style.display = 'none';
+    teamNameConfigSection.style.display = 'none';
+});
+
+function connectDataFile() {
+    const sheetUrl = document.getElementById('sheet-url').value.trim();
+    const connectButton = document.getElementById('connect-data');
+    const teamGenerationSection = document.getElementById('team-generation-section');
+    const teamNameConfigSection = document.getElementById('team-name-config-section');
+    
+    // Disable button and show loading
+    connectButton.disabled = true;
+    connectButton.textContent = 'Connecting...';
+    
+    // Load attending players
+    loadAttendingPlayers(sheetUrl)
+        .then(() => {
+            // Success - save URL to cookie and show team generation section and team name config section
+            setCookie('sheetUrl', sheetUrl, 30); // Save for 30 days
+            teamGenerationSection.style.display = 'block';
+            teamNameConfigSection.style.display = 'flex';
+            connectButton.textContent = 'Connected!';
+            connectButton.style.backgroundColor = '#28a745';
+            
+            // Add event listener for generate teams button
+            document.getElementById('generate-teams').addEventListener('click', () => generateTeams(sheetUrl));
+        })
+        .catch((error) => {
+            // Error - reset button and hide team name config section
+            connectButton.disabled = false;
+            connectButton.textContent = 'Connect Data File';
+            teamNameConfigSection.style.display = 'none';
+            alert('Failed to connect to data file: ' + error);
+        });
+}
+
+function loadAttendingPlayers(sheetUrl) {
+    return fetch(`/attending_players?url=${encodeURIComponent(sheetUrl)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load attending players');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            showAttendingPlayers(data);
+        });
+}
+
+function generateTeams(sheetUrl) {
     const button = document.getElementById('generate-teams');
     const attendingDiv = document.getElementById('attending-players');
     const teamsContainer = document.getElementById('teams-container');
-    const benchedSection = document.getElementById('benched');
     
     // Disable button
     button.disabled = true;
@@ -56,9 +83,8 @@ function generateTeams() {
     
     // Hide teams initially
     // teamsContainer.style.display = 'none';
-    // benchedSection.style.display = 'none';
     
-    fetch(`/generate_teams?match_id=${matchId}`)
+    fetch(`/generate_teams?url=${encodeURIComponent(sheetUrl)}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -69,12 +95,15 @@ function generateTeams() {
             
             // Show attending players
             const allPlayers = [...data.team_a, ...data.team_b];
-            if (data.benched) allPlayers.push(...data.benched);
-            showAttendingPlayers(allPlayers);
+            // Note: Attending players are already displayed from connectDataFile, don't reload them
+            
+            // Get team names from input boxes
+            const team1Name = document.getElementById('team1-name').value.trim() || 'Team 1';
+            const team2Name = document.getElementById('team2-name').value.trim() || 'Team 2';
             
             // Initialize team headers with total rating only
-            document.querySelector('#team-a h3').textContent = `Team A (Total: 0.0)`;
-            document.querySelector('#team-b h3').textContent = `Team B (Total: 0.0)`;
+            document.querySelector('#team-a h3').textContent = `${team1Name} (Total: 0.0)`;
+            document.querySelector('#team-b h3').textContent = `${team2Name} (Total: 0.0)`;
             
             // Start animation sequence
             setTimeout(() => {
@@ -90,6 +119,8 @@ function showAttendingPlayers(players) {
     const attendingDiv = document.getElementById('attending-players');
     
     const playersContainer = attendingDiv.querySelector('.attending-players');
+    // Clear existing bubbles first
+    playersContainer.innerHTML = '';
     players.forEach(player => {
         const bubble = document.createElement('div');
         bubble.className = 'player-bubble';
@@ -102,10 +133,13 @@ function showAttendingPlayers(players) {
 function animatePlayersToTeams(data) {
     const attendingDiv = document.getElementById('attending-players');
     const teamsContainer = document.getElementById('teams-container');
-    const benchedSection = document.getElementById('benched');
     
     // Show teams container
     teamsContainer.style.display = 'flex';
+    
+    // Get team names from input boxes
+    const team1Name = document.getElementById('team1-name').value.trim() || 'Team 1';
+    const team2Name = document.getElementById('team2-name').value.trim() || 'Team 2';
     
     // Get all bubbles
     const allBubbles = Array.from(attendingDiv.querySelectorAll('.player-bubble'));
@@ -142,11 +176,6 @@ function animatePlayersToTeams(data) {
             targetX = '250px'; // move right to team B
             targetTeam = 'team-b-players';
             playerData = data.team_b.find(p => p.name === playerName);
-        } else if (data.benched && data.benched.some(p => p.name === playerName)) {
-            targetX = '0px'; // stay for benched
-            targetTeam = 'benched-players';
-            benchedSection.style.display = 'block';
-            playerData = data.benched.find(p => p.name === playerName);
         }
         
         // Set the target position
@@ -156,7 +185,7 @@ function animatePlayersToTeams(data) {
         // After animation, add to team and continue
         setTimeout(() => {
             if (targetTeam && playerData) {
-                // Update stats only for team players, not benched
+                // Update stats for team players
                 if (targetTeam === 'team-a-players') {
                     teamAStats.count++;
                     teamAStats.total += playerData.rating;
@@ -164,7 +193,7 @@ function animatePlayersToTeams(data) {
                     playerCard.className = 'player-card';
                     playerCard.textContent = `${teamAStats.count}. ${playerData.name} (${playerData.position}) - ${playerData.rating}`;
                     document.getElementById(targetTeam).appendChild(playerCard);
-                    document.querySelector('#team-a h3').textContent = `Team A (Total: ${teamAStats.total.toFixed(1)})`;
+                    document.querySelector('#team-a h3').textContent = `${team1Name} (Total: ${teamAStats.total.toFixed(1)})`;
                 } else if (targetTeam === 'team-b-players') {
                     teamBStats.count++;
                     teamBStats.total += playerData.rating;
@@ -172,13 +201,7 @@ function animatePlayersToTeams(data) {
                     playerCard.className = 'player-card';
                     playerCard.textContent = `${teamBStats.count}. ${playerData.name} (${playerData.position}) - ${playerData.rating}`;
                     document.getElementById(targetTeam).appendChild(playerCard);
-                    document.querySelector('#team-b h3').textContent = `Team B (Total: ${teamBStats.total.toFixed(1)})`;
-                } else {
-                    // Benched players (no numbering)
-                    const playerCard = document.createElement('div');
-                    playerCard.className = 'player-card';
-                    playerCard.textContent = `${playerData.name} (${playerData.position}) - ${playerData.rating}`;
-                    document.getElementById(targetTeam).appendChild(playerCard);
+                    document.querySelector('#team-b h3').textContent = `${team2Name} (Total: ${teamBStats.total.toFixed(1)})`;
                 }
             }
             bubble.style.display = 'none'; // Hide bubble
@@ -194,4 +217,22 @@ function resetUI() {
     const button = document.getElementById('generate-teams');
     button.disabled = false;
     button.textContent = 'Generate Teams';
+}
+
+// Cookie utility functions
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + expires.toUTCString() + ';path=/';
+}
+
+function getCookie(name) {
+    const nameEQ = name + '=';
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+    }
+    return null;
 }

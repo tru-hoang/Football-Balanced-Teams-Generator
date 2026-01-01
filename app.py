@@ -4,11 +4,22 @@ import os
 from datetime import datetime
 import requests
 import io
+import re
 
 app = Flask(__name__)
 
 # Google Sheets URL
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1qv33BjZFsatS1j9M89SysgExFjQ-brUY/export?format=xlsx"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1XqjPWfkEZMASKfOHCp2ZScPimilws9lu/edit?usp=sharing&ouid=108596144190455174772&rtpof=true&sd=true"
+
+def convert_to_export_url(url):
+    """Convert Google Sheets URL to export format"""
+    # Extract the spreadsheet ID from various URL formats
+    # Pattern: /d/{SPREADSHEET_ID}/
+    match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', url)
+    if match:
+        spreadsheet_id = match.group(1)
+        return f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=xlsx"
+    return url  # Return as-is if we can't extract ID
 
 @app.route('/')
 def index():
@@ -16,8 +27,14 @@ def index():
 
 @app.route('/players')
 def get_players():
+    sheet_url = request.args.get('url')
+    if not sheet_url:
+        return jsonify({"error": "Sheet URL is required"}), 400
+    
     try:
-        response = requests.get(SHEET_URL)
+        # Convert to export URL if needed
+        export_url = convert_to_export_url(sheet_url)
+        response = requests.get(export_url)
         response.raise_for_status()
         players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
         active_players = players_df[players_df['active'] == True].to_dict('records')
@@ -28,7 +45,9 @@ def get_players():
 @app.route('/matches')
 def get_matches():
     try:
-        response = requests.get(SHEET_URL)
+        # Convert to export URL if needed
+        export_url = convert_to_export_url(SHEET_URL)
+        response = requests.get(export_url)
         response.raise_for_status()
         matches_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Matches')
         open_matches = matches_df[matches_df['status'] == 'OPEN'].to_dict('records')
@@ -36,112 +55,112 @@ def get_matches():
     except Exception as e:
         return jsonify({"error": f"Failed to load matches: {str(e)}"}), 500
 
+def get_player_positions(player):
+    """Get positions for a player based on position columns marked as 'Yes'"""
+    position_columns = {
+        'goalkeeper': 'GK',
+        'central_back_defender': 'CB',
+        'wing_back_defender': 'WB',
+        'central_midfielder': 'CM',
+        'wing_midfielder': 'WM',
+        'attacker': 'ATT'
+    }
+    
+    positions = []
+    for col, abbrev in position_columns.items():
+        value = player.get(col)
+        if value is not None:
+            if str(value).upper().strip() == 'YES' or value is True:
+                positions.append(abbrev)
+    
+    return ', '.join(positions) if positions else 'N/A'
+
 @app.route('/generate_teams')
 def generate_teams():
-    match_id = request.args.get('match_id')
-    if not match_id:
-        return jsonify({"error": "match_id required"}), 400
+    sheet_url = request.args.get('url')
+    if not sheet_url:
+        return jsonify({"error": "Sheet URL is required"}), 400
     
     try:
-        response = requests.get(SHEET_URL)
+        # Convert to export URL if needed
+        export_url = convert_to_export_url(sheet_url)
+        response = requests.get(export_url)
         response.raise_for_status()
         
-        # Get match details
-        matches_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Matches')
-        match = matches_df[matches_df['match_id'] == int(match_id)].to_dict('records')
-        if not match:
-            return jsonify({"error": "match not found"}), 404
-        match = match[0]
-        
-        # Get config
-        config_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Config')
-        config_dict = dict(zip(config_df['key'], config_df['value']))
-        
-        # Get attending players
-        attendance_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Attendance')
-        attending_for_match = attendance_df[(attendance_df['match_id'] == int(match_id)) & (attendance_df['attending'] == 'YES')]
-        
+        # Get attending players based on will_attend_next_match column only
         players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
-        players_dict = {p['player_id']: p for p in players_df.to_dict('records')}
         
-        # Filter players who are both attending the match AND have will_attend_next_match = TRUE
+        # Filter active players who will attend next match
+        active_players = players_df[players_df['active'] == True].copy()
+        
+        # Handle different data types in will_attend_next_match column
         attending_players = []
-        for a in attending_for_match.to_dict('records'):
-            if a['player_id'] in players_dict:
-                player = players_dict[a['player_id']]
-                # Check if player has will_attend_next_match column and it's 'YES' (case insensitive)
-                if 'will_attend_next_match' in player and str(player['will_attend_next_match']).upper() == 'YES':
-                    attending_players.append(player)
+        for _, player in active_players.iterrows():
+            will_attend = player.get('will_attend_next_match')
+            if will_attend is not None:
+                # Convert to string and check if it's 'YES' (case insensitive) or True
+                if str(will_attend).upper() == 'YES' or will_attend is True:
+                    attending_players.append(player.to_dict())
         
         if len(attending_players) < 2:
             return jsonify({"error": "not enough players"}), 400
         
-        # Calculate team size: half of attending players, bench if odd
-        team_size = len(attending_players) // 2
+        # Sort by overall rating descending
+        attending_players.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
         
-        # Calculate weighted rating
-        position_weights = {
-            'GK': config_dict.get('GK_WEIGHT', 1.0),
-            'DEF': config_dict.get('DEF_WEIGHT', 1.0),
-            'MID': config_dict.get('MID_WEIGHT', 1.0),
-            'ATT': config_dict.get('ATT_WEIGHT', 1.0)
-        }
+        # Balance teams by rating - distribute players to minimize rating difference
+        team_a = []
+        team_b = []
+        team_a_rating = 0
+        team_b_rating = 0
         
-        for p in attending_players:
-            pos = p.get('primary_position', 'MID')
-            weight = position_weights.get(pos, 1.0)
-            p['weighted_rating'] = p['overall_rating'] * weight
+        for player in attending_players:
+            rating = player.get('overall_rating', 0)
+            # Assign to team with lower current rating
+            if team_a_rating <= team_b_rating:
+                team_a.append(player)
+                team_a_rating += rating
+            else:
+                team_b.append(player)
+                team_b_rating += rating
         
-        # Sort by weighted rating descending
-        attending_players.sort(key=lambda x: x['weighted_rating'], reverse=True)
-        
-        # Select top players for teams (even number)
-        selected = attending_players[:2 * team_size]
-        
-        # Shuffle to randomize team assignment
-        import random
-        random.shuffle(selected)
-        
-        # Assign to teams
-        team_a = selected[:team_size]
-        team_b = selected[team_size:]
-        
-        # Note if any benched
-        benched = attending_players[2 * team_size:] if len(attending_players) > 2 * team_size else []
+        # No benched players - all players are assigned to teams
         
         return jsonify({
-            "team_a": [{"name": p['name'], "position": p['primary_position'], "rating": p['overall_rating']} for p in team_a],
-            "team_b": [{"name": p['name'], "position": p['primary_position'], "rating": p['overall_rating']} for p in team_b],
-            "benched": [{"name": p['name'], "position": p['primary_position'], "rating": p['overall_rating']} for p in benched]
+            "team_a": [{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in team_a],
+            "team_b": [{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in team_b]
         })
     except Exception as e:
         return jsonify({"error": f"Failed to generate teams: {str(e)}"}), 500
+
+@app.route('/attending_players')
 def get_attending_players():
-    match_id = request.args.get('match_id')
-    if not match_id:
-        return jsonify({"error": "match_id required"}), 400
+    sheet_url = request.args.get('url')
+    if not sheet_url:
+        return jsonify({"error": "Sheet URL is required"}), 400
     
     try:
-        response = requests.get(SHEET_URL)
+        # Convert to export URL if needed
+        export_url = convert_to_export_url(sheet_url)
+        response = requests.get(export_url)
         response.raise_for_status()
         
-        # Get attending players
-        attendance_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Attendance')
-        attending_for_match = attendance_df[(attendance_df['match_id'] == int(match_id)) & (attendance_df['attending'] == 'YES')]
-        
+        # Get attending players based on will_attend_next_match column only
         players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
-        players_dict = {p['player_id']: p for p in players_df.to_dict('records')}
         
-        # Filter players who are both attending the match AND have will_attend_next_match = TRUE
+        # Filter active players who will attend next match
+        active_players = players_df[players_df['active'] == True].copy()
+        
+        # Handle different data types in will_attend_next_match column
         attending_players = []
-        for a in attending_for_match.to_dict('records'):
-            if a['player_id'] in players_dict:
-                player = players_dict[a['player_id']]
-                # Check if player has will_attend_next_match column and it's 'YES' (case insensitive)
-                if 'will_attend_next_match' in player and str(player['will_attend_next_match']).upper() == 'YES':
-                    attending_players.append(player)
+        for _, player in active_players.iterrows():
+            will_attend = player.get('will_attend_next_match')
+            if will_attend is not None:
+                # Convert to string and check if it's 'YES' (case insensitive) or True
+                if str(will_attend).upper() == 'YES' or will_attend is True:
+                    attending_players.append(player.to_dict())
         
-        return jsonify([{"name": p['name'], "position": p['primary_position'], "rating": p['overall_rating']} for p in attending_players])
+        return jsonify([{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in attending_players])
     except Exception as e:
         return jsonify({"error": f"Failed to load attending players: {str(e)}"}), 500
 

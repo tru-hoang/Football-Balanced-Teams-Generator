@@ -10,7 +10,8 @@ body {
 h1 {
     text-align: center;
     color: white;
-    margin-bottom: 30px;
+    margin: 0px;
+    margin-bottom: 10px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
@@ -29,7 +30,7 @@ h2, h3 {
 }
 
 .section {
-    margin-bottom: 30px;
+    margin-bottom: 10px;
     padding: 15px;
     background: white;
     border-radius: 8px;
@@ -97,13 +98,16 @@ button:hover {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    margin-top: 20px;
     height: 700px;
-    padding: 20px;
+}
+
+.team-generation-section {
+    display: block;
+    height: 730px;
 }
 
 .team-column {
-    width: 350px;
+    width: 270px;
     background: #f8f9fa;
     padding: 15px;
     border-radius: 8px;
@@ -118,6 +122,7 @@ button:hover {
     text-align: center;
     margin-bottom: 10px;
     color: #28a745;
+    margin-top: 5px;
 }
 
 .team-players {
@@ -125,16 +130,15 @@ button:hover {
 }
 
 .attending-list {
-    width: 20%;
     background: #e9ecef;
     padding: 15px;
     border-radius: 8px;
     text-align: center;
-    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     height: 100%;
+    flex: 1;
 }
 
 .attending-list h4 {
@@ -235,4 +239,55 @@ button:hover {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Data Source Section */
+.config-section {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+    align-items: center;
+    justify-items: center;
+    justify-content: space-between;
+}
+
+.config-section label {
+    font-weight: bold;
+    color: #333;
+    white-space: nowrap;
+}
+
+.config-section input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.config-section input[type="text"]:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+.config-section button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    white-space: nowrap;
+}
+
+.config-section button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.config-section button:hover:not(:disabled) {
+    background-color: #0056b3;
 }

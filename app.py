@@ -5,11 +5,11 @@ from datetime import datetime
 import requests
 import io
 import re
+import random
 
 app = Flask(__name__)
 
 # Google Sheets URL
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1XqjPWfkEZMASKfOHCp2ZScPimilws9lu/edit?usp=sharing&ouid=108596144190455174772&rtpof=true&sd=true"
 
 def convert_to_export_url(url):
     """Convert Google Sheets URL to export format"""
@@ -42,25 +42,27 @@ def get_players():
     except Exception as e:
         return jsonify({"error": f"Failed to load players: {str(e)}"}), 500
 
-@app.route('/matches')
-def get_matches():
-    try:
-        # Convert to export URL if needed
-        export_url = convert_to_export_url(SHEET_URL)
-        response = requests.get(export_url)
-        response.raise_for_status()
-        matches_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Matches')
-        open_matches = matches_df[matches_df['status'] == 'OPEN'].to_dict('records')
-        return jsonify(open_matches)
-    except Exception as e:
-        return jsonify({"error": f"Failed to load matches: {str(e)}"}), 500
+
+def is_goalkeeper(player):
+    """Check if a player is a goalkeeper"""
+    value = player.get('goalkeeper')
+    if value is not None:
+        return str(value).upper().strip() == 'YES' or value is True
+    return False
+
+def is_main_goalkeeper(player):
+    """Check if a player is a main goalkeeper"""
+    value = player.get('main_goalkeeper')
+    if value is not None:
+        return str(value).upper().strip() == 'YES' or value is True
+    return False
 
 def get_player_positions(player):
     """Get positions for a player based on position columns marked as 'Yes'"""
     position_columns = {
         'goalkeeper': 'GK',
-        'central_back_defender': 'CB',
-        'wing_back_defender': 'WB',
+        'central_defender': 'CD',
+        'wing_defender': 'WD',
         'central_midfielder': 'CM',
         'wing_midfielder': 'WM',
         'attacker': 'ATT'
@@ -74,6 +76,16 @@ def get_player_positions(player):
                 positions.append(abbrev)
     
     return ', '.join(positions) if positions else 'N/A'
+
+def count_position_in_team(team, position_col):
+    """Count how many players in a team have a specific position"""
+    count = 0
+    for player in team:
+        value = player.get(position_col)
+        if value is not None:
+            if str(value).upper().strip() == 'YES' or value is True:
+                count += 1
+    return count
 
 @app.route('/generate_teams')
 def generate_teams():
@@ -105,24 +117,138 @@ def generate_teams():
         if len(attending_players) < 2:
             return jsonify({"error": "not enough players"}), 400
         
-        # Sort by overall rating descending
+        # Sort by overall rating descending, then shuffle players with same rating for randomness
         attending_players.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
         
-        # Balance teams by rating - distribute players to minimize rating difference
+        # Shuffle players with the same rating to add randomness
+        shuffled_players = []
+        current_rating = None
+        same_rating_group = []
+        
+        for player in attending_players:
+            rating = player.get('overall_rating', 0)
+            if current_rating is None or rating == current_rating:
+                same_rating_group.append(player)
+                current_rating = rating
+            else:
+                # Shuffle the group with same rating and add to shuffled list
+                random.shuffle(same_rating_group)
+                shuffled_players.extend(same_rating_group)
+                same_rating_group = [player]
+                current_rating = rating
+        
+        # Don't forget the last group
+        if same_rating_group:
+            random.shuffle(same_rating_group)
+            shuffled_players.extend(same_rating_group)
+        
+        # Separate goalkeepers from other players
+        goalkeepers = [p for p in shuffled_players if is_goalkeeper(p)]
+        other_players = [p for p in shuffled_players if not is_goalkeeper(p)]
+        
+        # Initialize teams
         team_a = []
         team_b = []
         team_a_rating = 0
         team_b_rating = 0
         
-        for player in attending_players:
+        # Step 1: Distribute goalkeepers evenly if there are 2 or more
+        if len(goalkeepers) >= 2:
+            # Separate main goalkeepers from regular goalkeepers
+            main_gks = [gk for gk in goalkeepers if is_main_goalkeeper(gk)]
+            regular_gks = [gk for gk in goalkeepers if not is_main_goalkeeper(gk)]
+            
+            # Sort main goalkeepers by rating (highest first)
+            main_gks.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
+            # Sort regular goalkeepers by rating (highest first)
+            regular_gks.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
+            
+            # Combine: main goalkeepers first, then regular goalkeepers
+            sorted_goalkeepers = main_gks + regular_gks
+            
+            # Distribute goalkeepers alternately to balance ratings
+            for i, gk in enumerate(sorted_goalkeepers):
+                rating = gk.get('overall_rating', 0)
+                if i % 2 == 0:
+                    team_a.append(gk)
+                    team_a_rating += rating
+                else:
+                    team_b.append(gk)
+                    team_b_rating += rating
+        
+        # Remaining players to distribute (goalkeepers if < 2, or all other players if >= 2 goalkeepers)
+        if len(goalkeepers) < 2:
+            remaining_players = goalkeepers + other_players
+        else:
+            remaining_players = other_players
+        
+        # Step 2: Distribute remaining players while balancing ratings and positions
+        position_columns = ['central_defender', 'wing_defender', 
+                           'central_midfielder', 'wing_midfielder', 'attacker']
+        
+        for player in remaining_players:
             rating = player.get('overall_rating', 0)
-            # Assign to team with lower current rating
-            if team_a_rating <= team_b_rating:
-                team_a.append(player)
-                team_a_rating += rating
+            
+            # Calculate position balance - check which team needs each position more
+            # Count positions this player has
+            player_positions = [pos for pos in position_columns 
+                              if player.get(pos) and (str(player.get(pos)).upper().strip() == 'YES' or player.get(pos) is True)]
+            
+            # Count how many positions favor each team (team with fewer players of that position needs it more)
+            team_a_votes = 0
+            team_b_votes = 0
+            for pos in player_positions:
+                count_a = count_position_in_team(team_a, pos)
+                count_b = count_position_in_team(team_b, pos)
+                if count_a < count_b:
+                    team_a_votes += 1  # Team A has fewer of this position
+                elif count_b < count_a:
+                    team_b_votes += 1  # Team B has fewer of this position
+                # If equal, no vote (positions are balanced for this position)
+            
+            # Calculate rating differences
+            rating_diff_if_a = abs((team_a_rating + rating) - team_b_rating)
+            rating_diff_if_b = abs(team_a_rating - (team_b_rating + rating))
+            
+            # Primary factor: rating balance
+            # Secondary factor: position balance (when rating difference is small)
+            rating_diff_threshold = 10  # If rating difference is less than this, consider positions
+            random_threshold = 5  # If rating difference is very small, use randomness
+            
+            rating_diff = abs(rating_diff_if_a - rating_diff_if_b)
+            
+            if rating_diff < random_threshold:
+                # Rating difference is very small, use randomness for variety
+                if random.random() < 0.5:
+                    team_a.append(player)
+                    team_a_rating += rating
+                else:
+                    team_b.append(player)
+                    team_b_rating += rating
+            elif rating_diff < rating_diff_threshold:
+                # Rating difference is small, use position balance as tiebreaker
+                if team_a_votes > team_b_votes:
+                    team_a.append(player)
+                    team_a_rating += rating
+                elif team_b_votes > team_a_votes:
+                    team_b.append(player)
+                    team_b_rating += rating
+                else:
+                    # Positions are equally balanced, use randomness for variety
+                    if random.random() < 0.5:
+                        team_a.append(player)
+                        team_a_rating += rating
+                    else:
+                        team_b.append(player)
+                        team_b_rating += rating
             else:
-                team_b.append(player)
-                team_b_rating += rating
+                # Rating difference is significant, prioritize rating balance
+                if rating_diff_if_a <= rating_diff_if_b:
+                    team_a.append(player)
+                    team_a_rating += rating
+                else:
+                    team_b.append(player)
+                    team_b_rating += rating
         
         # No benched players - all players are assigned to teams
         

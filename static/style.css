@@ -173,6 +173,8 @@ button:hover {
 .player-bubble.moving {
     z-index: 2000;
     animation: moveToTeam 4s ease-in-out forwards;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
 }
 
 @keyframes moveToTeam {
@@ -181,7 +183,7 @@ button:hover {
         opacity: 1;
     }
     50% {
-        transform:scale(1.5);
+        transform: scale(1.5);
         opacity: 1;
     }
     100% {

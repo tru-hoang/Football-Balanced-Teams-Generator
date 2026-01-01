@@ -151,10 +151,9 @@ function animatePlayersToTeams(data) {
     
     function animateRandom() {
         if (remainingBubbles.length === 0) {
-            // All done
-            setTimeout(() => {
-                resetUI();
-            }, 1000);
+            // All done - update button text and keep it disabled
+            const button = document.getElementById('generate-teams');
+            button.textContent = 'Generated';
             return;
         }
         

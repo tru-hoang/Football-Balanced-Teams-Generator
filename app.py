@@ -79,19 +79,16 @@ def generate_teams():
         
         # Get attending players based on will_attend_next_match column only
         players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
-        
-        # Filter active players who will attend next match
-        active_players = players_df[players_df['active'] == True].copy()
-        
+
         # Handle different data types in will_attend_next_match column
         attending_players = []
-        for _, player in active_players.iterrows():
+        for _, player in players_df.iterrows():
             will_attend = player.get('will_attend_next_match')
             if will_attend is not None:
                 # Convert to string and check if it's 'YES' (case insensitive) or True
                 if str(will_attend).upper() == 'YES' or will_attend is True:
                     attending_players.append(player.to_dict())
-        
+
         if len(attending_players) < 2:
             return jsonify({"error": "not enough players"}), 400
         
@@ -251,19 +248,16 @@ def get_attending_players():
         
         # Get attending players based on will_attend_next_match column only
         players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
-        
-        # Filter active players who will attend next match
-        active_players = players_df[players_df['active'] == True].copy()
-        
+
         # Handle different data types in will_attend_next_match column
         attending_players = []
-        for _, player in active_players.iterrows():
+        for _, player in players_df.iterrows():
             will_attend = player.get('will_attend_next_match')
             if will_attend is not None:
                 # Convert to string and check if it's 'YES' (case insensitive) or True
                 if str(will_attend).upper() == 'YES' or will_attend is True:
                     attending_players.append(player.to_dict())
-        
+
         return jsonify([{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in attending_players])
     except Exception as e:
         return jsonify({"error": f"Failed to load attending players: {str(e)}"}), 500

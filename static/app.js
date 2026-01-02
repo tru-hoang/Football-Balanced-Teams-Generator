@@ -225,6 +225,10 @@ function animatePlayersToTeams(data) {
         // Debug logging
         console.log('Bubble offset from attending:', bubbleOffsetFromAttending, 'Target X:', targetX);
 
+        // Set random intermediate position for more interesting animation
+        const randomX = (Math.random() - 0.5) * 400; // Random between -200 and 200
+        bubble.style.setProperty('--random-x', randomX + 'px');
+
         // Set the target position
         bubble.style.setProperty('--target-x', targetX);
         bubble.classList.add('moving');

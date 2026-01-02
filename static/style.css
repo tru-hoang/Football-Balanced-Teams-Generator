@@ -156,7 +156,7 @@ button:hover {
         opacity: 1;
     }
     50% {
-        transform: scale(1.5);
+        transform: translateX(var(--random-x, 0)) scale(1.5);
         opacity: 1;
     }
     100% {

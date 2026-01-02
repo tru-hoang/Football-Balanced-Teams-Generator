@@ -95,6 +95,9 @@ def generate_teams():
         # Sort by overall rating descending, then shuffle players with same rating for randomness
         attending_players.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
         
+
+        print(attending_players)
+                
         # Shuffle players with the same rating to add randomness
         shuffled_players = []
         current_rating = None
@@ -157,11 +160,12 @@ def generate_teams():
         else:
             remaining_players = other_players
 
-        # Step 2: Distribute remaining players alternately (like dealing cards)
-        # This ensures even team sizes while naturally balancing ratings
+        # Step 2: SIMPLE alternating distribution to ensure equal team sizes
+        # This guarantees balanced team sizes while maintaining rating fairness
         for i, player in enumerate(remaining_players):
             rating = player.get('overall_rating', 0)
-            if i % 2 == 0:
+            # Alternate between teams (even index = team A, odd index = team B)
+            if len(team_a) <= len(team_b):
                 team_a.append(player)
                 team_a_rating += rating
             else:
@@ -208,4 +212,4 @@ def get_attending_players():
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)

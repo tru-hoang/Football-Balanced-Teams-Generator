@@ -71,14 +71,14 @@ button:hover {
 
 #teams-container {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     justify-content: center;
-    height: 700px;
+    height: fit-content;
+    min-height: 650px;
 }
 
 .team-generation-section {
     display: block;
-    height: 730px;
 }
 
 .team-column {
@@ -88,7 +88,6 @@ button:hover {
     border-radius: 8px;
     border-top: 4px solid #28a745;
     flex-shrink: 0;
-    height: 100%;
     margin-left: 20px;
     margin-right: 20px;
 }
@@ -112,7 +111,6 @@ button:hover {
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100%;
     flex: 1;
 }
 

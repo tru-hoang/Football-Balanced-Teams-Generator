@@ -156,74 +156,17 @@ def generate_teams():
             remaining_players = goalkeepers + other_players
         else:
             remaining_players = other_players
-        
-        # Step 2: Distribute remaining players while balancing ratings and positions
-        position_columns = ['central_defender', 'wing_defender', 
-                           'central_midfielder', 'wing_midfielder', 'attacker']
-        
-        for player in remaining_players:
+
+        # Step 2: Distribute remaining players alternately (like dealing cards)
+        # This ensures even team sizes while naturally balancing ratings
+        for i, player in enumerate(remaining_players):
             rating = player.get('overall_rating', 0)
-            
-            # Calculate position balance - check which team needs each position more
-            # Count positions this player has
-            player_positions = [pos for pos in position_columns 
-                              if player.get(pos) and (str(player.get(pos)).upper().strip() == 'YES' or player.get(pos) is True)]
-            
-            # Count how many positions favor each team (team with fewer players of that position needs it more)
-            team_a_votes = 0
-            team_b_votes = 0
-            for pos in player_positions:
-                count_a = count_position_in_team(team_a, pos)
-                count_b = count_position_in_team(team_b, pos)
-                if count_a < count_b:
-                    team_a_votes += 1  # Team A has fewer of this position
-                elif count_b < count_a:
-                    team_b_votes += 1  # Team B has fewer of this position
-                # If equal, no vote (positions are balanced for this position)
-            
-            # Calculate rating differences
-            rating_diff_if_a = abs((team_a_rating + rating) - team_b_rating)
-            rating_diff_if_b = abs(team_a_rating - (team_b_rating + rating))
-            
-            # Primary factor: rating balance
-            # Secondary factor: position balance (when rating difference is small)
-            rating_diff_threshold = 10  # If rating difference is less than this, consider positions
-            random_threshold = 5  # If rating difference is very small, use randomness
-            
-            rating_diff = abs(rating_diff_if_a - rating_diff_if_b)
-            
-            if rating_diff < random_threshold:
-                # Rating difference is very small, use randomness for variety
-                if random.random() < 0.5:
-                    team_a.append(player)
-                    team_a_rating += rating
-                else:
-                    team_b.append(player)
-                    team_b_rating += rating
-            elif rating_diff < rating_diff_threshold:
-                # Rating difference is small, use position balance as tiebreaker
-                if team_a_votes > team_b_votes:
-                    team_a.append(player)
-                    team_a_rating += rating
-                elif team_b_votes > team_a_votes:
-                    team_b.append(player)
-                    team_b_rating += rating
-                else:
-                    # Positions are equally balanced, use randomness for variety
-                    if random.random() < 0.5:
-                        team_a.append(player)
-                        team_a_rating += rating
-                    else:
-                        team_b.append(player)
-                        team_b_rating += rating
+            if i % 2 == 0:
+                team_a.append(player)
+                team_a_rating += rating
             else:
-                # Rating difference is significant, prioritize rating balance
-                if rating_diff_if_a <= rating_diff_if_b:
-                    team_a.append(player)
-                    team_a_rating += rating
-                else:
-                    team_b.append(player)
-                    team_b_rating += rating
+                team_b.append(player)
+                team_b_rating += rating
         
         # No benched players - all players are assigned to teams
         

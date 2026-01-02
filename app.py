@@ -161,10 +161,10 @@ def generate_teams():
         # Sort GK candidates by rating (descending). Prioritize main_goalkeeper then normal goalkeeper
         gk_candidates = []
         gk_candidates.extend(position_buckets['main_gk'])  # Main GKs first
-        gk_candidates.extend([gk for gk in position_buckets['gk'] if gk not in position_buckets['main_gk']])  # Regular GKs
-
         # Sort by rating descending
         gk_candidates.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
+        
+        gk_candidates.extend([gk for gk in position_buckets['gk'] if gk not in position_buckets['main_gk']])  # Regular GKs
 
         # Pick top 2 GKs and assign to teams
         available_gks = [gk for gk in gk_candidates[:2] if id(gk) not in assigned_players]
@@ -270,7 +270,14 @@ def generate_teams():
 
             # Try swaps between players of same position
             for a_player in team_a_position_players:
+                # Skip main goalkeepers from swapping
+                if is_main_goalkeeper(a_player):
+                    continue
                 for b_player in team_b_position_players:
+                    # Skip main goalkeepers from swapping
+                    if is_main_goalkeeper(b_player):
+                        continue
+
                     a_rating = a_player.get('overall_rating', 0)
                     b_rating = b_player.get('overall_rating', 0)
 

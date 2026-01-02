@@ -81,8 +81,6 @@ function generateTeams(sheetUrl) {
     button.disabled = true;
     button.textContent = 'Generating...';
     
-    // Hide teams initially
-    // teamsContainer.style.display = 'none';
     
     fetch(`/generate_teams?url=${encodeURIComponent(sheetUrl)}`)
         .then(response => response.json())

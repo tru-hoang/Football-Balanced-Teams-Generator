@@ -1,15 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
-import os
-from datetime import datetime
 import requests
 import io
 import re
 import random
 
 app = Flask(__name__)
-
-# Google Sheets URL
 
 def convert_to_export_url(url):
     """Convert Google Sheets URL to export format"""
@@ -24,24 +20,6 @@ def convert_to_export_url(url):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/players')
-def get_players():
-    sheet_url = request.args.get('url')
-    if not sheet_url:
-        return jsonify({"error": "Sheet URL is required"}), 400
-    
-    try:
-        # Convert to export URL if needed
-        export_url = convert_to_export_url(sheet_url)
-        response = requests.get(export_url)
-        response.raise_for_status()
-        players_df = pd.read_excel(io.BytesIO(response.content), sheet_name='Players')
-        active_players = players_df[players_df['active'] == True].to_dict('records')
-        return jsonify(active_players)
-    except Exception as e:
-        return jsonify({"error": f"Failed to load players: {str(e)}"}), 500
-
 
 def is_goalkeeper(player):
     """Check if a player is a goalkeeper"""

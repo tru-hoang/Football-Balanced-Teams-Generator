@@ -4,21 +4,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const teamGenerationSection = document.getElementById('team-generation-section');
     const teamNameConfigSection = document.getElementById('team-name-config-section');
     
-    // Load saved URL from cookie
+    // Load saved data from cookies
     const savedUrl = getCookie('sheetUrl');
     if (savedUrl) {
         sheetUrlInput.value = savedUrl;
         connectButton.disabled = false;
     }
-    
+
+    // Load saved team names from cookies
+    const savedTeam1Name = getCookie('team1Name');
+    const savedTeam2Name = getCookie('team2Name');
+    if (savedTeam1Name) {
+        document.getElementById('team1-name').value = savedTeam1Name;
+    }
+    if (savedTeam2Name) {
+        document.getElementById('team2-name').value = savedTeam2Name;
+    }
+
+    // Save team names to cookies when they change
+    document.getElementById('team1-name').addEventListener('input', function() {
+        setCookie('team1Name', this.value, 30);
+    });
+    document.getElementById('team2-name').addEventListener('input', function() {
+        setCookie('team2Name', this.value, 30);
+    });
+
     // Enable/disable connect button based on URL input
     sheetUrlInput.addEventListener('input', function() {
         connectButton.disabled = !this.value.trim();
     });
-    
+
     // Handle connect button click
     connectButton.addEventListener('click', connectDataFile);
-    
+
     // Initially hide team generation section and team name config section
     teamGenerationSection.style.display = 'none';
     teamNameConfigSection.style.display = 'none';

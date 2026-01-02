@@ -94,15 +94,12 @@ def generate_teams():
         
         # Sort by overall rating descending, then shuffle players with same rating for randomness
         attending_players.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
-        
 
-        print(attending_players)
-                
         # Shuffle players with the same rating to add randomness
         shuffled_players = []
         current_rating = None
         same_rating_group = []
-        
+
         for player in attending_players:
             rating = player.get('overall_rating', 0)
             if current_rating is None or rating == current_rating:
@@ -114,66 +111,237 @@ def generate_teams():
                 shuffled_players.extend(same_rating_group)
                 same_rating_group = [player]
                 current_rating = rating
-        
+
         # Don't forget the last group
         if same_rating_group:
             random.shuffle(same_rating_group)
             shuffled_players.extend(same_rating_group)
-        
-        # Separate goalkeepers from other players
-        goalkeepers = [p for p in shuffled_players if is_goalkeeper(p)]
-        other_players = [p for p in shuffled_players if not is_goalkeeper(p)]
-        
+
+        # Step 1: Split Players by Position Pool (Create buckets without duplicating players)
+        # Players can appear in multiple buckets based on their positions
+        position_buckets = {
+            'main_gk': [],
+            'gk': [],
+            'central_defender': [],
+            'wing_defender': [],
+            'central_midfielder': [],
+            'wing_midfielder': [],
+            'attacker': []
+        }
+
+        for player in shuffled_players:
+            # Check main_goalkeeper first
+            if is_main_goalkeeper(player):
+                position_buckets['main_gk'].append(player)
+            # Check regular goalkeeper
+            if is_goalkeeper(player):
+                position_buckets['gk'].append(player)
+            # Check other positions
+            if player.get('central_defender') and str(player.get('central_defender')).upper().strip() == 'YES':
+                position_buckets['central_defender'].append(player)
+            if player.get('wing_defender') and str(player.get('wing_defender')).upper().strip() == 'YES':
+                position_buckets['wing_defender'].append(player)
+            if player.get('central_midfielder') and str(player.get('central_midfielder')).upper().strip() == 'YES':
+                position_buckets['central_midfielder'].append(player)
+            if player.get('wing_midfielder') and str(player.get('wing_midfielder')).upper().strip() == 'YES':
+                position_buckets['wing_midfielder'].append(player)
+            if player.get('attacker') and str(player.get('attacker')).upper().strip() == 'YES':
+                position_buckets['attacker'].append(player)
+
         # Initialize teams
         team_a = []
         team_b = []
         team_a_rating = 0
         team_b_rating = 0
-        
-        # Step 1: Distribute goalkeepers evenly if there are 2 or more
-        if len(goalkeepers) >= 2:
-            # Separate main goalkeepers from regular goalkeepers
-            main_gks = [gk for gk in goalkeepers if is_main_goalkeeper(gk)]
-            regular_gks = [gk for gk in goalkeepers if not is_main_goalkeeper(gk)]
-            
-            # Sort main goalkeepers by rating (highest first)
-            main_gks.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
-            # Sort regular goalkeepers by rating (highest first)
-            regular_gks.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
-            
-            # Combine: main goalkeepers first, then regular goalkeepers
-            sorted_goalkeepers = main_gks + regular_gks
-            
-            # Distribute goalkeepers alternately to balance ratings
-            for i, gk in enumerate(sorted_goalkeepers):
-                rating = gk.get('overall_rating', 0)
-                if i % 2 == 0:
-                    team_a.append(gk)
+
+        # Track assigned players to avoid double assignment
+        assigned_players = set()
+
+        # Step 2: Assign Goalkeepers First (Critical Position)
+        # Sort GK candidates by rating (descending). Prioritize main_goalkeeper then normal goalkeeper
+        gk_candidates = []
+        gk_candidates.extend(position_buckets['main_gk'])  # Main GKs first
+        gk_candidates.extend([gk for gk in position_buckets['gk'] if gk not in position_buckets['main_gk']])  # Regular GKs
+
+        # Sort by rating descending
+        gk_candidates.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
+
+        # Pick top 2 GKs and assign to teams
+        available_gks = [gk for gk in gk_candidates[:2] if id(gk) not in assigned_players]
+
+        if len(available_gks) >= 2:
+            # Assign strongest GK to weaker team (initially random)
+            team_a_gk = available_gks[0]
+            team_b_gk = available_gks[1]
+
+            team_a.append(team_a_gk)
+            team_a_rating += team_a_gk.get('overall_rating', 0)
+            assigned_players.add(id(team_a_gk))
+
+            team_b.append(team_b_gk)
+            team_b_rating += team_b_gk.get('overall_rating', 0)
+            assigned_players.add(id(team_b_gk))
+
+        # Step 3: Fill Other Positions One by One
+        position_assignment_order = ['central_defender', 'wing_defender', 'central_midfielder', 'wing_midfielder', 'attacker']
+        random.shuffle(position_assignment_order)  # Shuffle for random priority
+
+        for position in position_assignment_order:
+            # Get available candidates (exclude already assigned players)
+            candidates = [p for p in position_buckets[position] if id(p) not in assigned_players]
+
+            if not candidates:
+                continue
+
+            # Sort by rating (descending)
+            candidates.sort(key=lambda x: x.get('overall_rating', 0), reverse=True)
+
+            # Calculate how many players we need for this position (rough estimate)
+            total_players_needed = len(shuffled_players) // 2  # Half for each team
+            position_players_needed = max(1, len(candidates) // 2)  # At least 1 per team if available
+
+            # Alternating Assignment (Snake Draft)
+            for i in range(min(position_players_needed * 2, len(candidates))):
+                player = candidates[i]
+                if id(player) in assigned_players:
+                    continue
+
+                rating = player.get('overall_rating', 0)
+
+                # Assign best available player to the currently weaker team
+                if team_a_rating <= team_b_rating:
+                    team_a.append(player)
                     team_a_rating += rating
                 else:
-                    team_b.append(gk)
+                    team_b.append(player)
                     team_b_rating += rating
-        
-        # Remaining players to distribute (goalkeepers if < 2, or all other players if >= 2 goalkeepers)
-        if len(goalkeepers) < 2:
-            remaining_players = goalkeepers + other_players
-        else:
-            remaining_players = other_players
 
-        # Step 2: SIMPLE alternating distribution to ensure equal team sizes
-        # This guarantees balanced team sizes while maintaining rating fairness
-        for i, player in enumerate(remaining_players):
+                assigned_players.add(id(player))
+
+        # Step 4: Handle Multi-Position Players and Remaining Players
+        # Assign any remaining players (multi-position or unassigned)
+        remaining_candidates = [p for p in shuffled_players if id(p) not in assigned_players]
+
+        for player in remaining_candidates:
             rating = player.get('overall_rating', 0)
-            # Alternate between teams (even index = team A, odd index = team B)
-            if len(team_a) <= len(team_b):
+
+            # Assign to weaker team
+            if team_a_rating <= team_b_rating:
                 team_a.append(player)
                 team_a_rating += rating
             else:
                 team_b.append(player)
                 team_b_rating += rating
-        
+
+        # Step 5: Balance Adjustment (Optional but Recommended)
+        # Try 1-for-1 swaps within same position to reduce rating difference
+        # This is a simplified version - check for potential swaps that improve balance
+        rating_difference = abs(team_a_rating - team_b_rating)
+
+        # For each position, try to find swap opportunities
+        for position in position_assignment_order:
+            # Get players from each team who can play this position
+            team_a_position_players = []
+            team_b_position_players = []
+
+            for player in team_a:
+                if position == 'central_defender' and player.get('central_defender') == 'Yes':
+                    team_a_position_players.append(player)
+                elif position == 'wing_defender' and player.get('wing_defender') == 'Yes':
+                    team_a_position_players.append(player)
+                elif position == 'central_midfielder' and player.get('central_midfielder') == 'Yes':
+                    team_a_position_players.append(player)
+                elif position == 'wing_midfielder' and player.get('wing_midfielder') == 'Yes':
+                    team_a_position_players.append(player)
+                elif position == 'attacker' and player.get('attacker') == 'Yes':
+                    team_a_position_players.append(player)
+
+            for player in team_b:
+                if position == 'central_defender' and player.get('central_defender') == 'Yes':
+                    team_b_position_players.append(player)
+                elif position == 'wing_defender' and player.get('wing_defender') == 'Yes':
+                    team_b_position_players.append(player)
+                elif position == 'central_midfielder' and player.get('central_midfielder') == 'Yes':
+                    team_b_position_players.append(player)
+                elif position == 'wing_midfielder' and player.get('wing_midfielder') == 'Yes':
+                    team_b_position_players.append(player)
+                elif position == 'attacker' and player.get('attacker') == 'Yes':
+                    team_b_position_players.append(player)
+
+            # Try swaps between players of same position
+            for a_player in team_a_position_players:
+                for b_player in team_b_position_players:
+                    a_rating = a_player.get('overall_rating', 0)
+                    b_rating = b_player.get('overall_rating', 0)
+
+                    # Calculate new rating difference after swap
+                    new_team_a_rating = team_a_rating - a_rating + b_rating
+                    new_team_b_rating = team_b_rating - b_rating + a_rating
+                    new_difference = abs(new_team_a_rating - new_team_b_rating)
+
+                    # If swap improves balance, perform it
+                    if new_difference < rating_difference:
+                        # Perform the swap
+                        team_a.remove(a_player)
+                        team_b.remove(b_player)
+                        team_a.append(b_player)
+                        team_b.append(a_player)
+
+                        # Update ratings
+                        team_a_rating = new_team_a_rating
+                        team_b_rating = new_team_b_rating
+                        rating_difference = new_difference
+
+                        # Only do one swap per position for simplicity
+                        break
+                else:
+                    continue
+                break
+
+        # Final size balancing check
+        # If team sizes differ by more than 2 players, balance them
+        size_diff = abs(len(team_a) - len(team_b))
+        if size_diff > 2:
+            # Determine which team is larger and which is smaller
+            if len(team_a) > len(team_b):
+                larger_team = team_a
+                smaller_team = team_b
+                larger_team_rating = team_a_rating
+                smaller_team_rating = team_b_rating
+            else:
+                larger_team = team_b
+                smaller_team = team_a
+                larger_team_rating = team_b_rating
+                smaller_team_rating = team_a_rating
+
+            # Find the weakest (lowest rated) non-main goalkeeper player in the larger team
+            non_main_gk_candidates = []
+            for player in larger_team:
+                if not is_main_goalkeeper(player):  # Exclude main goalkeepers
+                    non_main_gk_candidates.append(player)
+
+            if non_main_gk_candidates:
+                # Sort by rating (ascending - weakest first)
+                non_main_gk_candidates.sort(key=lambda x: x.get('overall_rating', 0))
+
+                # Move the weakest player to the smaller team
+                player_to_move = non_main_gk_candidates[0]
+                player_rating = player_to_move.get('overall_rating', 0)
+
+                # Remove from larger team and add to smaller team
+                larger_team.remove(player_to_move)
+                smaller_team.append(player_to_move)
+
+                # Update ratings
+                if larger_team == team_a:
+                    team_a_rating -= player_rating
+                    team_b_rating += player_rating
+                else:
+                    team_b_rating -= player_rating
+                    team_a_rating += player_rating
+
         # No benched players - all players are assigned to teams
-        
+
         return jsonify({
             "team_a": [{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in team_a],
             "team_b": [{"name": p['name'], "position": get_player_positions(p), "rating": p['overall_rating']} for p in team_b]

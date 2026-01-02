@@ -115,7 +115,11 @@ function generateTeams(sheetUrl) {
 
 function showAttendingPlayers(players) {
     const attendingDiv = document.getElementById('attending-players');
-    
+
+    // Update header with player count
+    const header = attendingDiv.querySelector('h4');
+    header.textContent = `Attending Players (${players.length})`;
+
     const playersContainer = attendingDiv.querySelector('.attending-players');
     // Clear existing bubbles first
     playersContainer.innerHTML = '';
@@ -131,18 +135,36 @@ function showAttendingPlayers(players) {
 function animatePlayersToTeams(data) {
     const attendingDiv = document.getElementById('attending-players');
     const teamsContainer = document.getElementById('teams-container');
-    
+
     // Show teams container
     teamsContainer.style.display = 'flex';
-    
+
+    // Calculate center positions of team cards relative to attending players
+    const attendingRect = attendingDiv.getBoundingClientRect();
+    const teamARect = document.getElementById('team-a').getBoundingClientRect();
+    const teamBRect = document.getElementById('team-b').getBoundingClientRect();
+
+    // Calculate positions relative to the viewport
+    const attendingCenterX = attendingRect.left + attendingRect.width / 2;
+    const teamACenterX = teamARect.left + teamARect.width / 2;
+    const teamBCenterX = teamBRect.left + teamBRect.width / 2;
+
+    const teamAOffset = teamACenterX - attendingCenterX;
+    const teamBOffset = teamBCenterX - attendingCenterX;
+
+    // Debug logging
+    console.log('Attending center X:', attendingCenterX);
+    console.log('Team A center X:', teamACenterX, 'Offset:', teamAOffset);
+    console.log('Team B center X:', teamBCenterX, 'Offset:', teamBOffset);
+
     // Get team names from input boxes
     const team1Name = document.getElementById('team1-name').value.trim() || 'Team 1';
     const team2Name = document.getElementById('team2-name').value.trim() || 'Team 2';
-    
+
     // Get all bubbles
     const allBubbles = Array.from(attendingDiv.querySelectorAll('.player-bubble'));
     const remainingBubbles = [...allBubbles];
-    
+
     // Track current team stats
     let teamAStats = { count: 0, total: 0 };
     let teamBStats = { count: 0, total: 0 };
@@ -164,17 +186,27 @@ function animatePlayersToTeams(data) {
         let targetX = '0px';
         let targetTeam = null;
         let playerData = null;
-        
+
+        // Calculate bubble's current position relative to attending center
+        const bubbleRect = bubble.getBoundingClientRect();
+        const bubbleCenterX = bubbleRect.left + bubbleRect.width / 2;
+        const bubbleOffsetFromAttending = bubbleCenterX - attendingCenterX;
+
         if (data.team_a.some(p => p.name === playerName)) {
-            targetX = '-250px'; // move left to team A
+            // Move from bubble's current position to team A center
+            targetX = (teamAOffset - bubbleOffsetFromAttending) + 'px';
             targetTeam = 'team-a-players';
             playerData = data.team_a.find(p => p.name === playerName);
         } else if (data.team_b.some(p => p.name === playerName)) {
-            targetX = '250px'; // move right to team B
+            // Move from bubble's current position to team B center
+            targetX = (teamBOffset - bubbleOffsetFromAttending) + 'px';
             targetTeam = 'team-b-players';
             playerData = data.team_b.find(p => p.name === playerName);
         }
-        
+
+        // Debug logging
+        console.log('Bubble offset from attending:', bubbleOffsetFromAttending, 'Target X:', targetX);
+
         // Set the target position
         bubble.style.setProperty('--target-x', targetX);
         bubble.classList.add('moving');

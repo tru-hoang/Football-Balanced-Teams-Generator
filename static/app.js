@@ -197,6 +197,11 @@ function animatePlayersToTeams(data) {
             const attendingDiv = document.getElementById('attending-players');
             attendingDiv.style.display = 'none';
 
+            // Trigger confetti celebration after 1 second delay
+            setTimeout(() => {
+                createConfetti();
+            }, 100); // 1 second delay for dramatic effect
+
             return;
         }
         
@@ -267,6 +272,96 @@ function animatePlayersToTeams(data) {
     
     // Start the random sequence
     animateRandom();
+}
+
+function createConfetti() {
+    // Create confetti container
+    const container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+
+    // Create 250 stars and 250 confetti particles (500 total)
+    const starCount = 250;
+    const confettiCount = 250;
+
+    // Confetti shapes
+    const confettiShapes = ['🎈', '🎊', '🎉', '🎁', '🏆', '⚽', '🏀', '🎾', '🏈', '🎯', '💎', '🔥', '⭐', '✨', '💫', '🌟', '🎆', '🎇', '💥', '✨'];
+
+    // Create stars
+    for (let i = 0; i < starCount; i++) {
+        const star = document.createElement('div');
+        star.className = 'confetti-star';
+
+        // Random properties for each star
+        const randomDelay = Math.random() * 2; // 0-2 seconds delay for explosion timing
+        const randomSize = 12 + Math.random() * 16; // 12-28px size
+        const isStarEmoji = Math.random() > 0.5; // 50% chance for each emoji
+
+        // Calculate maximum distance to screen edges for full-screen explosion
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const centerX = viewportWidth / 2;
+        const centerY = viewportHeight / 2;
+
+        // Calculate distance to farthest corner for maximum coverage
+        const cornerDistances = [
+            Math.sqrt(centerX * centerX + centerY * centerY), // top-left
+            Math.sqrt((viewportWidth - centerX) * (viewportWidth - centerX) + centerY * centerY), // top-right
+            Math.sqrt(centerX * centerX + (viewportHeight - centerY) * (viewportHeight - centerY)), // bottom-left
+            Math.sqrt((viewportWidth - centerX) * (viewportWidth - centerX) + (viewportHeight - centerY) * (viewportHeight - centerY)) // bottom-right
+        ];
+        const maxDistance = Math.max(...cornerDistances);
+
+        // Random explosion direction and distance (full screen coverage)
+        const angle = Math.random() * 360; // Random angle in degrees
+        const distance = maxDistance * (0.8 + Math.random() * 0.4); // 80-120% of max distance for edge coverage
+
+        // Convert angle and distance to x,y coordinates
+        const explodeX = Math.cos(angle * Math.PI / 180) * distance;
+        const explodeY = Math.sin(angle * Math.PI / 180) * distance;
+
+        star.style.setProperty('--explode-x', explodeX + 'px');
+        star.style.setProperty('--explode-y', explodeY + 'px');
+        star.style.animationDelay = randomDelay + 's';
+        star.style.fontSize = randomSize + 'px';
+        star.textContent = isStarEmoji ? '⭐' : '✨';
+
+        container.appendChild(star);
+    }
+
+    // Create confetti particles
+    for (let i = 0; i < confettiCount; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti-particle';
+
+        // Random properties for each confetti
+        const randomDelay = Math.random() * 2; // 0-2 seconds delay for explosion timing
+        const randomSize = 14 + Math.random() * 20; // 14-34px size
+        const randomShape = confettiShapes[Math.floor(Math.random() * confettiShapes.length)];
+
+        // Random explosion direction and distance (full screen coverage)
+        const angle = Math.random() * 360; // Random angle in degrees
+        const distance = maxDistance * (0.8 + Math.random() * 0.4); // 80-120% of max distance for edge coverage
+
+        // Convert angle and distance to x,y coordinates
+        const explodeX = Math.cos(angle * Math.PI / 180) * distance;
+        const explodeY = Math.sin(angle * Math.PI / 180) * distance;
+
+        confetti.style.setProperty('--explode-x', explodeX + 'px');
+        confetti.style.setProperty('--explode-y', explodeY + 'px');
+        confetti.style.animationDelay = randomDelay + 's';
+        confetti.style.fontSize = randomSize + 'px';
+        confetti.textContent = randomShape;
+
+        container.appendChild(confetti);
+    }
+
+    // Remove confetti after all particles have completed falling (longer duration)
+    setTimeout(() => {
+        if (container.parentNode) {
+            container.parentNode.removeChild(container);
+        }
+    }, 20000); // 11 seconds to ensure all 500 particles complete their fall
 }
 
 function resetUI() {

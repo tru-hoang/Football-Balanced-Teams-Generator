@@ -5,9 +5,37 @@ import io
 import re
 import random
 import os
+import logging
 from datetime import datetime
 
 app = Flask(__name__)
+
+# Configure logging
+log_dir = os.path.join(app.root_path, 'logs')
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(log_dir, 'app.log')),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@app.before_request
+def log_request_info():
+    """Log user IP address and request details for each request"""
+    # Get the real IP address (handles proxies/load balancers)
+    ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if ip_address and ',' in ip_address:
+        # Take the first IP if there are multiple (comma-separated)
+        ip_address = ip_address.split(',')[0].strip()
+
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    logger.info(f"Request from IP: {ip_address} | Method: {request.method} | Path: {request.path} | User-Agent: {user_agent}")
 
 def get_file_version(filename):
     """Get file version based on modification time for cache busting"""

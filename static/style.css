@@ -78,11 +78,13 @@ button:hover {
 }
 
 .team-generation-section {
-    display: block;
+    display: none;
 }
 
 .team-column {
-    width: 270px;
+    min-width: 270px;
+    max-width: 400px;
+    flex: 1;
     background: #f8f9fa;
     padding: 15px;
     border-radius: 8px;
@@ -111,7 +113,7 @@ button:hover {
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 1;
+    flex: 2;
 }
 
 .attending-list h4 {

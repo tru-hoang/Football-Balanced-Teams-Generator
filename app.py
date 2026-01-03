@@ -4,8 +4,20 @@ import requests
 import io
 import re
 import random
+import os
+from datetime import datetime
 
 app = Flask(__name__)
+
+def get_file_version(filename):
+    """Get file version based on modification time for cache busting"""
+    static_path = os.path.join(app.root_path, 'static', filename)
+    try:
+        mtime = os.path.getmtime(static_path)
+        return str(int(mtime))
+    except OSError:
+        # If file doesn't exist, return current timestamp
+        return str(int(datetime.now().timestamp()))
 
 def convert_to_export_url(url):
     """Convert Google Sheets URL to export format"""
@@ -19,7 +31,13 @@ def convert_to_export_url(url):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Get versions for cache busting
+    css_version = get_file_version('style.css')
+    js_version = get_file_version('app.js')
+
+    return render_template('index.html',
+                         css_version=css_version,
+                         js_version=js_version)
 
 def is_goalkeeper(player):
     """Check if a player is a goalkeeper"""

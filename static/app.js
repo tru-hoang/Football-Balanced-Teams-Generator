@@ -189,9 +189,14 @@ function animatePlayersToTeams(data) {
     
     function animateRandom() {
         if (remainingBubbles.length === 0) {
-            // All done - update button text and keep it disabled
+            // All done - update button text, hide attending players, and keep it disabled
             const button = document.getElementById('generate-teams');
             button.textContent = 'Generated';
+
+            // Hide the attending players section
+            const attendingDiv = document.getElementById('attending-players');
+            attendingDiv.style.display = 'none';
+
             return;
         }
         

@@ -34,10 +34,12 @@ def index():
     # Get versions for cache busting
     css_version = get_file_version('style.css')
     js_version = get_file_version('app.js')
+    favicon_version = get_file_version('favicon.png')
 
     return render_template('index.html',
                          css_version=css_version,
-                         js_version=js_version)
+                         js_version=js_version,
+                         favicon_version=favicon_version)
 
 def is_goalkeeper(player):
     """Check if a player is a goalkeeper"""

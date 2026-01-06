@@ -7,6 +7,7 @@ import random
 import os
 import logging
 from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 
 app = Flask(__name__)
 
@@ -15,11 +16,23 @@ log_dir = os.path.join(app.root_path, 'logs')
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
+# Create a timed rotating file handler that creates new log files daily with date in filename
+current_date = datetime.now().strftime('%Y-%m-%d')
+file_handler = TimedRotatingFileHandler(
+    os.path.join(log_dir, f'{current_date}.log'),
+    when='midnight',  # Rotate at midnight
+    interval=1,       # Every 1 day
+    backupCount=30    # Keep 30 days of logs
+)
+
+# Set the format for the log files (without date in filename since TimedRotatingFileHandler adds it)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(log_dir, 'app.log')),
+        file_handler,
         logging.StreamHandler()
     ]
 )
